@@ -1,9 +1,9 @@
 import streamlit as st #스트림릿 페이지
-
+import pandas as pd
 # import 대상 -> 파일(.py)
 #from 파일 import 함수, 클래스 -> 해당 파일의 일부 함수/ 클래스만 임포트 
 #import crawling as cr 밑에랑 같은 기능을 할수있게 해주는 코드 
-from crawling import crawling_saramin, crawling_work24
+from crawler import crawling_saramin, crawling_work24, download_to_csv
 
 #레이아웃(웹 페이지의 생김새)
 #스트림릿 웹페이지의 '헤더'역할
@@ -65,7 +65,7 @@ with st.expander("상세 검색 조건", expanded=True):
             #loc_options(딕셔너리)이므로, loc_options['부산'] => 값
             # x는 '서울', '경기', '부산' 같은 '지역 명'
             #if조건 붙는 이유: '지역명'이 없는 '지역'이라면 추가 안됨.
-            locations = [loc_options[x] for x in selected_location if loc_options[x]]
+            location = [loc_options[x] for x in selected_location if loc_options[x]]
             #st.write(locations)
 
             #직무 검색
@@ -128,22 +128,36 @@ crawling_clicked = st.button("크롤링 시작",
 # 크롤링 시행!
 #1. 크롤링한 결과를 어떻게 받아올 것인가?
 # df =
+if 'df' not in st.session_state:
+    st.session_state['df'] =pd.DataFrame()
 #2. 크롤링 하는동안 어떻게 안내할 것인가?
-if crawling_clicked: ...
+if crawling_clicked: 
 #2-1. 검색어나 필수요소가 누락된 경우 안내
         #검색어(search_text)가 없다(not)
     if not search_text:
             st.warning('검색어를 입력해주세요!')
 #2-2. 크롤링 시행하는 동안 ' 기다려주세요' 라는 내용 표시
     else: 
-        with st.spinner(f"{search_select}에서 {search_text} 검색 결과 가져오는중..."):
+        with st.spinner(f"{site_select}에서 {search_text} 검색 결과 가져오는중..."):
             #st.write(f'{site_select}에서 {search_text} 검색 결과 가져오는중...')
             if site_select == '사람인':
                     #사람인 사이트의 내용을 크롤링하는 함수 
-                    df = crawling_saramin()
+                    df = crawling_saramin(search_text = search_text,
+                                            except_text = except_text,
+                                            region = location,
+                                            category = category,
+                                            career= career,
+                                            education = edu,
+                                            max_pages = max_pages)
             else:
                     #고용24 사이트의 내용을 크롤링하는 함수 
-                    df = crawling_work24()
+                    df = crawling_work24(search_text = search_text,
+                                            except_text = except_text,
+                                            region = region,
+                                            category = occupation,
+                                            career= career,
+                                            education = edu,
+                                            max_pages = max_pages)
 
     st.session_state['df'] = df
 #st.session_state 가 뭘까?
@@ -152,3 +166,18 @@ if crawling_clicked: ...
 #session_state['df']
 #df['expection'] == df.expection
 df = st.session_state['df']
+st.write(df)
+
+
+if not df.empty:
+        st.subheader('검색 결과')
+        st.dataframe(df,
+                        use_container_width = True,
+                        hide_index = True)
+
+        csv_data = download_to_csv(df)
+        st.download_button(label = 'CSV 결과 다운로드',
+                            data = csv_data,
+                            file_name =f'crawling_results_site{site_select}.csv',
+                            mime = 'text/csv')
+
